@@ -1,14 +1,16 @@
-// Leicester Car Recovery — data model
-// Dev uses SQLite for zero-setup local running. Swap the datasource to
-// Postgres (or Turso/libSQL, matching the Aurum Oud stack) for production —
-// see README "Going to production".
+﻿// Leicester Car Recovery — data model
+// Postgres from the start — a free Vercel Postgres (Neon) database works
+// for both local dev and production, and it's the only option that
+// actually works once deployed: Vercel's filesystem is ephemeral, so
+// SQLite's dev.db file would vanish between requests in production.
+// See README "Get it live" for exactly where DATABASE_URL comes from.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
