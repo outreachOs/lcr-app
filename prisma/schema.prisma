@@ -1,4 +1,4 @@
-﻿// Leicester Car Recovery — data model
+// Leicester Car Recovery — data model
 // Postgres from the start — a free Vercel Postgres (Neon) database works
 // for both local dev and production, and it's the only option that
 // actually works once deployed: Vercel's filesystem is ephemeral, so
