@@ -1,0 +1,135 @@
+// Leicester Car Recovery — data model
+// Dev uses SQLite for zero-setup local running. Swap the datasource to
+// Postgres (or Turso/libSQL, matching the Aurum Oud stack) for production —
+// see README "Going to production".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  DRIVER
+  ADMIN
+}
+
+enum DriverStatus {
+  PENDING   // applied, awaiting review
+  APPROVED  // can receive jobs
+  REJECTED
+  SUSPENDED
+}
+
+enum VehicleType {
+  RECOVERY_TRUCK
+  FLATBED
+  VAN
+}
+
+enum ServiceType {
+  CAR
+  VAN
+  ACCIDENT
+  TRANSPORT
+}
+
+enum JobStatus {
+  REQUESTED   // customer submitted, awaiting dispatch
+  ASSIGNED    // admin has assigned a driver
+  EN_ROUTE    // driver heading to pickup
+  ARRIVED     // driver at pickup location
+  RECOVERED   // vehicle recovered, heading to drop-off
+  COMPLETED   // job done, payment settled
+  CANCELLED
+
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String?   @unique
+  phone         String    @unique
+  passwordHash  String
+  role          Role      @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+
+  driver        Driver?
+  jobsAsCustomer Job[]    @relation("CustomerJobs")
+}
+
+model Driver {
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id])
+
+  vehicleType   VehicleType
+  vehicleDesc   String        // e.g. "Ford Transit Recovery Truck"
+  vehicleReg    String
+  coverageArea  String        // e.g. "Leicester & up to 20 miles"
+  licenceRef    String?       // reference/number, not the document itself
+  insuranceConfirmed Boolean  @default(false)
+
+  status        DriverStatus  @default(PENDING)
+  ratingAvg     Float         @default(5.0)
+  jobsCompleted Int           @default(0)
+
+  lastLat       Float?
+  lastLng       Float?
+  lastPingAt    DateTime?
+
+  appliedAt     DateTime      @default(now())
+  approvedAt    DateTime?
+
+  jobs          Job[]         @relation("DriverJobs")
+}
+
+model Job {
+  id              String      @id @default(cuid())
+
+  customerId      String
+  customer        User        @relation("CustomerJobs", fields: [customerId], references: [id])
+
+  driverId        String?
+  driver          Driver?     @relation("DriverJobs", fields: [driverId], references: [id])
+
+  serviceType     ServiceType
+  pickupAddress   String
+  pickupPostcode  String
+  pickupLat       Float?
+  pickupLng       Float?
+  dropoffAddress  String
+  dropoffPostcode String
+  dropoffLat      Float?
+  dropoffLng      Float?
+  distanceMiles   Float?      // pickup→dropoff, via postcodes.io geocoding
+
+  priceEstimateLow  Int       // pence — shown to the customer at booking
+  priceEstimateHigh Int       // pence
+  wholesaleQuote    Int?      // pence — what the driver quotes AB for the job (AB's own reference, never shown to the customer)
+  priceFinal        Int?      // pence — what the customer is actually charged, set once the driver's quoted
+
+  status          JobStatus   @default(REQUESTED)
+  notes           String?
+
+  requestedAt     DateTime    @default(now())
+  assignedAt      DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+
+  statusHistory   JobStatusEvent[]
+}
+
+// Lightweight audit trail — powers the tracking timeline on the customer
+// screen and the admin dashboard without re-deriving it from timestamps.
+model JobStatusEvent {
+  id        String    @id @default(cuid())
+  jobId     String
+  job       Job       @relation(fields: [jobId], references: [id])
+  status    JobStatus
+  at        DateTime  @default(now())
+}
